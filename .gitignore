@@ -1,0 +1,8 @@
+.*.cmd
+*.o
+*.ko
+.*.swp
+modules.order
+Module.symvers
+snd-usb-exbox.mod.c
+.tmp_versions/
