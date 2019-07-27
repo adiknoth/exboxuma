@@ -599,6 +599,8 @@ static int exbox_pcm_init_urb(struct pcm_urb *urb,
 	usb_fill_bulk_urb(&urb->instance, chip->dev,
 			  (is_input ? usb_rcvbulkpipe(chip->dev, ep) : usb_sndbulkpipe(chip->dev, ep)), (void *)urb->buffer,
 			  PCM_PACKET_SIZE, handler, urb);
+	if (usb_urb_ep_type_check(&urb->instance))
+		return -EINVAL;
 	init_usb_anchor(&urb->submitted);
 
 	return 0;
@@ -682,14 +684,23 @@ int exbox_pcm_init(struct exbox_chip *chip, u8 extra_freq)
 	rt->capture.active = false;
 
 	for (i = 0; i < PCM_N_URBS; i++) {
-		exbox_pcm_init_urb(&rt->in_urbs[i], chip, true, EP_IN,
+		ret = exbox_pcm_init_urb(&rt->in_urbs[i], chip, true, EP_IN,
 				    exbox_pcm_in_urb_handler);
-		exbox_pcm_init_urb(&rt->out_urbs[i], chip, false, EP_OUT,
+		if (ret < 0) {
+			kfree(rt);
+			dev_err(&chip->dev->dev, "Cannot initialise input URBs\n");
+			return ret;
+}
+		ret = exbox_pcm_init_urb(&rt->out_urbs[i], chip, false, EP_OUT,
 				    exbox_pcm_out_urb_handler);
+		if (ret < 0) {
+			kfree(rt);
+			dev_err(&chip->dev->dev, "Cannot initialise output URBs\n");
+			return ret;
+		}
 
 		rt->in_urbs[i].peer = &rt->out_urbs[i];
 		rt->out_urbs[i].peer = &rt->in_urbs[i];
-
 	}
 
 	ret = snd_pcm_new(chip->card, "D.O.tec UMA", 0, 1, 1, &pcm);
