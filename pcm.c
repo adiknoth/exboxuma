@@ -501,6 +501,8 @@ static int exbox_pcm_prepare(struct snd_pcm_substream *alsa_sub)
 
 	mutex_lock(&rt->stream_mutex);
 
+	exbox_pcm_stream_stop(rt);
+
 	sub->dma_off = 0;
 	sub->period_off = 0;
 
