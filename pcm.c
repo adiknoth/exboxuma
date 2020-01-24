@@ -687,16 +687,14 @@ int exbox_pcm_init(struct exbox_chip *chip, u8 extra_freq)
 		ret = exbox_pcm_init_urb(&rt->in_urbs[i], chip, true, EP_IN,
 				    exbox_pcm_in_urb_handler);
 		if (ret < 0) {
-			kfree(rt);
 			dev_err(&chip->dev->dev, "Cannot initialise input URBs\n");
-			return ret;
-}
+			goto error;
+		}
 		ret = exbox_pcm_init_urb(&rt->out_urbs[i], chip, false, EP_OUT,
 				    exbox_pcm_out_urb_handler);
 		if (ret < 0) {
-			kfree(rt);
 			dev_err(&chip->dev->dev, "Cannot initialise output URBs\n");
-			return ret;
+			goto error;
 		}
 
 		rt->in_urbs[i].peer = &rt->out_urbs[i];
@@ -705,9 +703,8 @@ int exbox_pcm_init(struct exbox_chip *chip, u8 extra_freq)
 
 	ret = snd_pcm_new(chip->card, "D.O.tec UMA", 0, 1, 1, &pcm);
 	if (ret < 0) {
-		kfree(rt);
 		dev_err(&chip->dev->dev, "Cannot create pcm instance\n");
-		return ret;
+		goto error;
 	}
 
 	pcm->private_data = rt;
@@ -721,4 +718,12 @@ int exbox_pcm_init(struct exbox_chip *chip, u8 extra_freq)
 
 	chip->pcm = rt;
 	return 0;
+
+error:
+	for (i = 0; i < PCM_N_URBS; i++) {
+		kfree(rt->in_urbs[i].buffer);
+		kfree(rt->out_urbs[i].buffer);
+	}
+	kfree(rt);
+	return ret;
 }
