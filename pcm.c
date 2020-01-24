@@ -470,18 +470,6 @@ static int exbox_pcm_close(struct snd_pcm_substream *alsa_sub)
 	return 0;
 }
 
-static int exbox_pcm_hw_params(struct snd_pcm_substream *alsa_sub,
-				struct snd_pcm_hw_params *hw_params)
-{
-	return snd_pcm_lib_malloc_pages(alsa_sub,
-					params_buffer_bytes(hw_params));
-}
-
-static int exbox_pcm_hw_free(struct snd_pcm_substream *alsa_sub)
-{
-	return snd_pcm_lib_free_pages(alsa_sub);
-}
-
 static int exbox_pcm_prepare(struct snd_pcm_substream *alsa_sub)
 {
 	struct pcm_runtime *rt = snd_pcm_substream_chip(alsa_sub);
@@ -575,8 +563,6 @@ static const struct snd_pcm_ops pcm_ops = {
 	.open = exbox_pcm_open,
 	.close = exbox_pcm_close,
 	.ioctl = snd_pcm_lib_ioctl,
-	.hw_params = exbox_pcm_hw_params,
-	.hw_free = exbox_pcm_hw_free,
 	.prepare = exbox_pcm_prepare,
 	.trigger = exbox_pcm_trigger,
 	.pointer = exbox_pcm_pointer,
@@ -712,8 +698,8 @@ int exbox_pcm_init(struct exbox_chip *chip, u8 extra_freq)
 	strlcpy(pcm->name, "D.O.tec UMA", sizeof(pcm->name));
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &pcm_ops);
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &pcm_ops);
-	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_VMALLOC,
-					NULL, 0, 0);
+	snd_pcm_set_managed_buffer_all(pcm, SNDRV_DMA_TYPE_VMALLOC,
+				       NULL, 0, 0);
 
 	rt->instance = pcm;
 
