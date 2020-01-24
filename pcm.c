@@ -562,7 +562,6 @@ static snd_pcm_uframes_t exbox_pcm_pointer(struct snd_pcm_substream *alsa_sub)
 static const struct snd_pcm_ops pcm_ops = {
 	.open = exbox_pcm_open,
 	.close = exbox_pcm_close,
-	.ioctl = snd_pcm_lib_ioctl,
 	.prepare = exbox_pcm_prepare,
 	.trigger = exbox_pcm_trigger,
 	.pointer = exbox_pcm_pointer,
