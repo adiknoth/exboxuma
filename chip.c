@@ -486,7 +486,7 @@ static int exbox_chip_probe(struct usb_interface *intf,
 	struct usb_device *device = interface_to_usbdev(intf);
         int regidx = -1; /* index in module parameter array */
 
-#if 0
+#if 1
 	ret = usb_set_interface(device, 0, 1);
 	if (ret != 0) {
 		dev_err(&device->dev, "can't set first interface for " CARD_NAME " device.\n");
