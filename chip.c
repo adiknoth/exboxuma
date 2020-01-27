@@ -308,18 +308,22 @@ int snd_exbox_get_samplerate(struct exbox_chip *chip)
 {
   int err;
   int rate;
+  const size_t datalen = 3;
+  u8 *data;
   struct usb_device *dev = chip->dev;
-  unsigned char data[3];
 
-  memset(&data, 0, sizeof(data));
+  data = kcalloc(sizeof(u8), datalen, GFP_ATOMIC);
+  if (!data)
+	  return -ENOMEM;
+
   err = usb_control_msg(dev,
 		  usb_rcvctrlpipe(dev, 0),
 		  0x81,
 		  0xa2,
 		  0x0100,
 		  EP_IN,
-		  &data,
-		  sizeof(data),
+		  data,
+		  datalen,
 		  1000);
 
   if (err < 0) {
@@ -338,8 +342,13 @@ int snd_exbox_set_samplerate(struct exbox_chip *chip, unsigned int rate)
 {
   int err;
   int readback_rate;
+  const size_t datalen = 3;
+  u8 *data;
   struct usb_device *dev = chip->dev;
-  unsigned char data[3];
+
+  data = kcalloc(sizeof(u8), datalen, GFP_ATOMIC);
+  if (!data)
+	  return -ENOMEM;
 
   data[0] = (rate & 0xFF);
   data[1] = (rate & 0xFF00) >> 8;
@@ -350,7 +359,6 @@ int snd_exbox_set_samplerate(struct exbox_chip *chip, unsigned int rate)
   data[2] = rate >> 16;
 
 
-  memset(&data, 0, sizeof(data));
   err = usb_control_msg(dev,
 		  usb_sndctrlpipe(dev, 0),
 		  UAC_SET_CUR,
@@ -358,7 +366,7 @@ int snd_exbox_set_samplerate(struct exbox_chip *chip, unsigned int rate)
 		  UAC_EP_CS_ATTR_SAMPLE_RATE << 8,
 		  EP_IN,
 		  data,
-		  sizeof(data),
+		  datalen,
 		  1000);
 
   if (err < 0) {
@@ -374,7 +382,7 @@ int snd_exbox_set_samplerate(struct exbox_chip *chip, unsigned int rate)
 		  0x0100,
 		  EP_OUT,
 		  data,
-		  sizeof(data),
+		  datalen,
 		  1000);
 
   if (err < 0) {
