@@ -266,9 +266,13 @@ X Bit5: 16 instead of 32 inputs, doesn't apply here
 static unsigned char snd_exbox_read_status(struct exbox_chip *chip)
 {
 	int rc;
-	unsigned char status = 0;
+	unsigned char *status;
 	struct usb_device *dev = chip->dev;
 
+
+	status = kzalloc(sizeof(unsigned char), GFP_KERNEL);
+	if (!status)
+		return -ENOMEM;
 
 	rc = usb_control_msg(dev,
 			usb_rcvctrlpipe(dev, 0),
@@ -276,13 +280,15 @@ static unsigned char snd_exbox_read_status(struct exbox_chip *chip)
 			0xc0,
 			//USB_TYPE_VENDOR | USB_RECIP_DEVICE | USB_DIR_IN,
 			0x0, 0,
-			&status, sizeof(status), 1000);
+			status, sizeof(status), 1000);
 
 	if (rc < 0) {
 		dev_err(&dev->dev, "Error reading EXBOX status:%i\n",
 				rc);
 	}
-	return status;
+
+	kfree(status);
+	return *status;
 }
 
 int snd_exbox_write_status(struct exbox_chip *chip, unsigned char status)
