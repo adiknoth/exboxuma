@@ -334,13 +334,14 @@ int snd_exbox_get_samplerate(struct exbox_chip *chip)
 	  rate = data[0] + (data[1] << 8);
   }
 
+  kfree(data);
   return rate;
 
 }
 
 int snd_exbox_set_samplerate(struct exbox_chip *chip, unsigned int rate)
 {
-  int err;
+  int rc = 0;
   int readback_rate;
   const size_t datalen = 3;
   u8 *data;
@@ -359,7 +360,7 @@ int snd_exbox_set_samplerate(struct exbox_chip *chip, unsigned int rate)
   data[2] = rate >> 16;
 
 
-  err = usb_control_msg(dev,
+  rc = usb_control_msg(dev,
 		  usb_sndctrlpipe(dev, 0),
 		  UAC_SET_CUR,
 		  USB_TYPE_CLASS | USB_RECIP_ENDPOINT | USB_DIR_OUT,
@@ -369,13 +370,13 @@ int snd_exbox_set_samplerate(struct exbox_chip *chip, unsigned int rate)
 		  datalen,
 		  1000);
 
-  if (err < 0) {
+  if (rc < 0) {
 		dev_err(&dev->dev, "Error setting samplerate %i: %i\n",
-			rate, err);
-		return err;
+			rate, rc);
+		goto out;
   }
 
-  err = usb_control_msg(dev,
+  rc = usb_control_msg(dev,
 		  usb_sndctrlpipe(dev, 0),
 		  0x01,
 		  0x22,
@@ -385,10 +386,10 @@ int snd_exbox_set_samplerate(struct exbox_chip *chip, unsigned int rate)
 		  datalen,
 		  1000);
 
-  if (err < 0) {
+  if (rc < 0) {
 		dev_err(&dev->dev, "Error setting samplerate %i: %i\n",
-			rate, err);
-		return err;
+			rate, rc);
+		goto out;
   }
 
   readback_rate = snd_exbox_get_samplerate(chip);
@@ -397,11 +398,14 @@ int snd_exbox_set_samplerate(struct exbox_chip *chip, unsigned int rate)
   if (readback_rate != (unsigned) rate) {
 		dev_err(&dev->dev, "Error setting samplerate to %iHz (device did not accept rate)\n",
 			rate);
-		return -1;
+		rc = -1;
+		goto out;
   }
 
 
-  return 0;
+out:
+  kfree(data);
+  return rc;
 }
 
 static void
