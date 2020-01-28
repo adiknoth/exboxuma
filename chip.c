@@ -59,6 +59,33 @@ struct exbox_vendor_quirk {
 	u8 extra_freq;
 };
 
+/*
+ * Wrapper for usb_control_msg().
+ * Allocates a temp buffer to prevent DMAing from/to the stack.
+ * Copied from sound/usb/usx2y/us122l.c.
+ */
+static int exbox_ctl_msg(struct usb_device *dev, unsigned int pipe,
+			  __u8 request, __u8 requesttype,
+			  __u16 value, __u16 index, void *data,
+			  __u16 size, int timeout)
+{
+	int err;
+	void *buf = NULL;
+
+	if (size > 0) {
+		buf = kmemdup(data, size, GFP_KERNEL);
+		if (!buf)
+			return -ENOMEM;
+	}
+	err = usb_control_msg(dev, pipe, request, requesttype,
+			      value, index, buf, size, timeout);
+	if (size > 0) {
+		memcpy(data, buf, size);
+		kfree(buf);
+	}
+	return err;
+}
+
 static int my_control_info(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_info *uinfo)
 {
           uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
@@ -266,29 +293,24 @@ X Bit5: 16 instead of 32 inputs, doesn't apply here
 static unsigned char snd_exbox_read_status(struct exbox_chip *chip)
 {
 	int rc;
-	unsigned char *status;
+	unsigned char status;
 	struct usb_device *dev = chip->dev;
 
 
-	status = kzalloc(sizeof(unsigned char), GFP_KERNEL);
-	if (!status)
-		return -ENOMEM;
-
-	rc = usb_control_msg(dev,
+	rc = exbox_ctl_msg(dev,
 			usb_rcvctrlpipe(dev, 0),
 			0x49,
 			0xc0,
 			//USB_TYPE_VENDOR | USB_RECIP_DEVICE | USB_DIR_IN,
 			0x0, 0,
-			status, sizeof(status), 1000);
+			&status, sizeof(status), 1000);
 
 	if (rc < 0) {
 		dev_err(&dev->dev, "Error reading EXBOX status:%i\n",
 				rc);
 	}
 
-	kfree(status);
-	return *status;
+	return status;
 }
 
 int snd_exbox_write_status(struct exbox_chip *chip, unsigned char status)
@@ -315,14 +337,10 @@ int snd_exbox_get_samplerate(struct exbox_chip *chip)
   int err;
   int rate;
   const size_t datalen = 3;
-  u8 *data;
+  unsigned char data[3];
   struct usb_device *dev = chip->dev;
 
-  data = kcalloc(sizeof(u8), datalen, GFP_KERNEL);
-  if (!data)
-	  return -ENOMEM;
-
-  err = usb_control_msg(dev,
+  err = exbox_ctl_msg(dev,
 		  usb_rcvctrlpipe(dev, 0),
 		  0x81,
 		  0xa2,
@@ -340,7 +358,6 @@ int snd_exbox_get_samplerate(struct exbox_chip *chip)
 	  rate = data[0] + (data[1] << 8);
   }
 
-  kfree(data);
   return rate;
 
 }
@@ -350,23 +367,22 @@ int snd_exbox_set_samplerate(struct exbox_chip *chip, unsigned int rate)
   int rc = 0;
   int readback_rate;
   const size_t datalen = 3;
-  u8 *data;
+  unsigned char data[3];
   struct usb_device *dev = chip->dev;
 
-  data = kcalloc(sizeof(u8), datalen, GFP_KERNEL);
-  if (!data)
-	  return -ENOMEM;
-
+#if 0
   data[0] = (rate & 0xFF);
   data[1] = (rate & 0xFF00) >> 8;
   data[2] = 0;
-
+#else
+  /* This is the class compliant version. */
   data[0] = rate;
   data[1] = rate >> 8;
   data[2] = rate >> 16;
+#endif
 
 
-  rc = usb_control_msg(dev,
+  rc = exbox_ctl_msg(dev,
 		  usb_sndctrlpipe(dev, 0),
 		  UAC_SET_CUR,
 		  USB_TYPE_CLASS | USB_RECIP_ENDPOINT | USB_DIR_OUT,
@@ -379,10 +395,10 @@ int snd_exbox_set_samplerate(struct exbox_chip *chip, unsigned int rate)
   if (rc < 0) {
 		dev_err(&dev->dev, "Error setting samplerate %i: %i\n",
 			rate, rc);
-		goto out;
+		return rc;
   }
 
-  rc = usb_control_msg(dev,
+  rc = exbox_ctl_msg(dev,
 		  usb_sndctrlpipe(dev, 0),
 		  0x01,
 		  0x22,
@@ -395,23 +411,19 @@ int snd_exbox_set_samplerate(struct exbox_chip *chip, unsigned int rate)
   if (rc < 0) {
 		dev_err(&dev->dev, "Error setting samplerate %i: %i\n",
 			rate, rc);
-		goto out;
+		return rc;
   }
 
   readback_rate = snd_exbox_get_samplerate(chip);
   chip->samplerate = readback_rate;
 
   if (readback_rate != (unsigned) rate) {
-		dev_err(&dev->dev, "Error setting samplerate to %iHz (device did not accept rate)\n",
-			rate);
-		rc = -1;
-		goto out;
+		dev_err(&dev->dev, "Error setting samplerate to %iHz (device still at %iHz)\n",
+			rate, readback_rate);
+		return -1;
   }
 
-
-out:
-  kfree(data);
-  return rc;
+  return rc; /* 0 */
 }
 
 static void
