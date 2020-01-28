@@ -312,7 +312,7 @@ int snd_exbox_get_samplerate(struct exbox_chip *chip)
   u8 *data;
   struct usb_device *dev = chip->dev;
 
-  data = kcalloc(sizeof(u8), datalen, GFP_ATOMIC);
+  data = kcalloc(sizeof(u8), datalen, GFP_KERNEL);
   if (!data)
 	  return -ENOMEM;
 
@@ -347,7 +347,7 @@ int snd_exbox_set_samplerate(struct exbox_chip *chip, unsigned int rate)
   u8 *data;
   struct usb_device *dev = chip->dev;
 
-  data = kcalloc(sizeof(u8), datalen, GFP_ATOMIC);
+  data = kcalloc(sizeof(u8), datalen, GFP_KERNEL);
   if (!data)
 	  return -ENOMEM;
 
